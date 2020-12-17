@@ -1,0 +1,213 @@
+/*
+ * Copyright (C) 2020, Hensoldt Cyber GmbH
+ */
+
+/*
+ *  CertServer CAmkES Component
+ *
+ *  to be used as:
+ *
+ *      #include "CertServer/camkes/CertServer.camkes"
+ *
+ *      CertServer_COMPONENT_DEFINE(CertServer_1)
+ *      CertServer_COMPONENT_DEFINE(CertServer_2)
+ *
+ */
+
+#pragma once
+
+import <std_connector.camkes>;
+import <if_OS_Entropy.camkes>;
+
+import <CertServer/camkes/if_CertServer.camkes>;
+
+#include "LibMacros/ForEach.h"
+
+
+//------------------------------------------------------------------------------
+
+
+struct CertServer_Config {
+    int numCerts;
+    string trustedCerts[];
+}
+
+
+//------------------------------------------------------------------------------
+
+
+/*
+ * Declare the CertServer with a given type name:
+ *
+ *      CertServer_COMPONENT_DEFINE(
+ *          <name>
+ *      )
+ */
+#define CertServer_COMPONENT_DEFINE( \
+    _name_) \
+    \
+    component _name_ { \
+        attribute       CertServer_Config         certServer_cfg; \
+        \
+        maybe dataport  Buf                       certServer_port1; \
+        maybe dataport  Buf                       certServer_port2; \
+        maybe dataport  Buf                       certServer_port3; \
+        maybe dataport  Buf                       certServer_port4; \
+        maybe dataport  Buf                       certServer_port5; \
+        maybe dataport  Buf                       certServer_port6; \
+        maybe dataport  Buf                       certServer_port7; \
+        maybe dataport  Buf                       certServer_port8; \
+        provides        if_CertServer             certServer_rpc;   \
+        \
+        dataport        Buf                       entropy_port; \
+        uses            if_OS_Entropy             entropy_rpc; \
+        \
+    }
+
+
+//------------------------------------------------------------------------------
+
+
+/*
+ * Assign all the non-client interfaces:
+ *
+ *      CertServer_INSTANCE_CONNECT(
+ *          <instance>,
+ *          <entropy>.<rpc>, <entrop>.<port>,
+ *          <storage>.<rpc>, <storage>.<port>
+ *      )
+ */
+#define CertServer_INSTANCE_CONNECT( \
+    _inst_, \
+    _entropy_rpc_, \
+    _entropy_port_) \
+    \
+    connection  seL4RPCCall \
+        _inst_ ## _entropy_rpc( \
+            from    _inst_.entropy_rpc, \
+            to      _entropy_rpc_ \
+        ); \
+    connection seL4SharedData \
+        _inst_ ## _entropy_port( \
+            from    _inst_.entropy_port, \
+            to      _entropy_port_ \
+        );
+
+
+//------------------------------------------------------------------------------
+
+
+// Set a single connection; this is used internally
+#define CertServer_CLIENT_CONNECTOR( \
+    _inst_, \
+    _unused_, \
+    _rpc_, \
+    _port_, \
+    _num_) \
+    \
+    connection  seL4RPCCall \
+        _inst_ ## cert_rpc ## _num_( \
+            from    _rpc_, \
+            to      _inst_.certServer_rpc \
+        ); \
+    connection seL4SharedData \
+        _inst_ ## cert_port ## _num_ ( \
+            from    _port_, \
+            to      _inst_.certServer ## _port ## _num_ \
+        );
+
+
+/*
+ * Assign all clients via this variadic macro:
+ *
+ *      CertServer_INSTANCE_CONNECT_CLIENTS(
+ *          <instance>,
+ *          <client0>.<rpc>,  <client0>.<port>,
+ *          <client1>.<rpc>,  <client1>.<port>
+ *          ....
+ *      )
+ *
+ * NOTE: Can take up to 8 clients.
+ *
+ */
+#define CertServer_INSTANCE_CONNECT_CLIENTS( \
+    _inst_, \
+    ...) \
+    \
+    FOR_EACH_2P(CertServer_CLIENT_CONNECTOR,_inst_,UNUSED,__VA_ARGS__)
+
+
+//------------------------------------------------------------------------------
+
+
+/*
+ * Configure a flexible number of trusted certificates used by the CertServer
+ * in the following manner:
+ *
+ *      CertServer_INSTANCE_CONFIGURE(
+ *          <instance>,
+ *          <num>,
+ *          <cert1>, <cert2>, ...
+ *      )
+ *
+ */
+#define CertServer_INSTANCE_CONFIGURE( \
+    _inst_, \
+    _num_, \
+    ...) \
+    \
+    _inst_.certServer_cfg = { \
+        "numCerts"     : _num_, \
+        "trustedCerts" : [ __VA_ARGS__ ] \
+    };
+
+
+//------------------------------------------------------------------------------
+
+
+// Assign a single badge; this is used internally
+#define CertServer_BADGE_ASSIGNER( \
+    _unused0_, \
+    _unused1_, \
+    _rpc_, \
+    _num_) \
+    \
+    _rpc_ ## _attributes = (100 + _num_);
+
+
+/*
+ * Assign all clients a badge, in the order in which they are connected to the
+ * StorageServer instance via CertServer_INSTANCE_CONNECT_CLIENTS():
+ *
+ *      CertServer_CLIENT_ASSIGN_BADGE(
+ *          <client_rpc>, <ID>
+ *      )
+ *
+ * NOTE: IDs need to start at 101!
+ *
+ */
+#define CertServer_CLIENT_ASSIGN_BADGE( \
+    _rpc_, \
+    _val_) \
+    \
+    _rpc_ ## _attributes = _val_;
+
+
+/*
+ * Assign badges to a list of clients; badge IDs will start at 101 and then be
+ * incremented. Make sure to pass clients in same order as they are passed
+ * in the CertServer_INSTANCE_CONNECT_CLIENTS() macro:
+ *
+ *      CertServer_CLIENT_ASSIGN_BADGES(
+ *          <client0_rpc>,
+ *          <client1_rpc>,
+ *           ...
+ *      )
+ *
+ * NOTE: Can take up to 8 clients.
+ *
+ */
+#define CertServer_CLIENT_ASSIGN_BADGES( \
+    ...) \
+    \
+    FOR_EACH_1P(CertServer_BADGE_ASSIGNER,UNUSED,UNUSED,__VA_ARGS__)
