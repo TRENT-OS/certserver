@@ -1,7 +1,7 @@
 /* Copyright (C) 2020, Hensoldt Cyber GmbH */
 
 #include "CertServer.h"
-#include "LibMacros/Check.h"
+#include "lib_macros/Check.h"
 
 OS_Error_t
 CertServer_initChain(

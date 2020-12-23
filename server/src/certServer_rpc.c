@@ -2,9 +2,9 @@
 
 #include "OS_CertParser.h"
 
-#include "LibDebug/Debug.h"
-#include "LibMacros/Check.h"
-#include "LibContext/ContextMgr.h"
+#include "lib_debug/Debug.h"
+#include "lib_macros/Check.h"
+#include "lib_server/ContextMgr.h"
 
 #include <stdint.h>
 
